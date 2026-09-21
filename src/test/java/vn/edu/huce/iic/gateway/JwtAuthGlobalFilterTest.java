@@ -1,5 +1,8 @@
 package vn.edu.huce.iic.gateway;
 
+import vn.edu.huce.iic.gateway.config.GatewayProperties;
+import vn.edu.huce.iic.gateway.filter.JwtAuthGlobalFilter;
+
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Test;

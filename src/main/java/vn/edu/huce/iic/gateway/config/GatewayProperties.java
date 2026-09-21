@@ -1,4 +1,4 @@
-package vn.edu.huce.iic.gateway;
+package vn.edu.huce.iic.gateway.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
