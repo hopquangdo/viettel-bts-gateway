@@ -2,10 +2,12 @@
 #
 # Secrets cần có ở repo này (Settings > Secrets and variables > Actions, environment "production"):
 #   SSH_HOST, SSH_PORT (mặc định 22), SSH_USER, SSH_PRIVATE_KEY   vào server chạy k3s
-#   KUBE_NAMESPACE                                                ví dụ viettel-prod
+#   KUBE_NAMESPACE                                                (tùy chọn) mặc định viettel-prod
+#   GHCR_USERNAME, GHCR_TOKEN                                     (tùy chọn) PAT push+pull (write:packages + read:packages); nếu có sẽ dùng
+#                                                                 thay GITHUB_TOKEN để đẩy image (cần khi package chưa gắn với repo)
 #
 # Image chỉ đẩy lên ghcr.io bằng GITHUB_TOKEN. Deploy = `kubectl set image` đúng tag sha-xxxxxxx vừa build; lỗi
-# rollout thì tự `rollout undo`. Lần đầu (chưa có Deployment) chạy workflow "Deploy" ở repo viettel-vtk-deploy.
+# rollout thì tự `rollout undo`. Lần đầu (chưa có Deployment) chạy scripts/apply.sh (repo viettel-vtk-deploy) trên server.
 
 name: CI/CD
 
@@ -57,8 +59,9 @@ jobs:
       - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          # Có GHCR_TOKEN (+ GHCR_USERNAME) thì dùng; không thì dùng GITHUB_TOKEN của workflow.
+          username: ${{ (secrets.GHCR_TOKEN != '' && secrets.GHCR_USERNAME) || github.actor }}
+          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
       - name: Resolve image
         id: meta
         run: |
@@ -96,7 +99,7 @@ jobs:
       - name: Set image and wait for rollout
         uses: appleboy/ssh-action@v1.2.0
         env:
-          NS: ${{ secrets.KUBE_NAMESPACE }}
+          NS: ${{ secrets.KUBE_NAMESPACE || 'viettel-prod' }}
           IMAGE: ${{ needs.build.outputs.image }}
           DEPLOYMENT: ${{ env.DEPLOYMENT }}
         with:
@@ -114,7 +117,7 @@ jobs:
 
             if ! $K -n "$NS" get deploy "$DEPLOYMENT" >/dev/null 2>&1; then
               echo "Deployment $DEPLOYMENT chưa tồn tại trong namespace $NS."
-              echo "Chạy workflow Deploy ở repo viettel-vtk-deploy để tạo hạ tầng k8s lần đầu."
+              echo "Chạy scripts/apply.sh (repo viettel-vtk-deploy) trên server để tạo hạ tầng k8s lần đầu."
               exit 1
             fi
 
