@@ -1,6 +1,7 @@
 package vn.edu.huce.iic.gateway.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 import java.util.List;
 
@@ -11,6 +12,9 @@ public record GatewayProperties(Jwt jwt, List<String> publicPaths, List<String> 
         this(jwt, publicPaths, blockedPaths, new Rules(false, List.of()));
     }
 
+    // Bản ghi có 2 constructor: phải chỉ rõ constructor chính để Spring Boot gán cấu hình
+    // (nếu không sẽ báo "No default constructor found" khi khởi động).
+    @ConstructorBinding
     public GatewayProperties {
         publicPaths = publicPaths == null ? List.of() : List.copyOf(publicPaths);
         blockedPaths = blockedPaths == null ? List.of() : List.copyOf(blockedPaths);
