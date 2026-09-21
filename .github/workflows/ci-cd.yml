@@ -52,7 +52,8 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     timeout-minutes: 30
     outputs:
-      image: ${{ steps.meta.outputs.ref }}
+      # Chỉ truyền tag: GitHub loại bỏ job output nếu nó chứa chuỗi trùng giá trị một secret (tên image chứa tên tài khoản).
+      tag: ${{ steps.meta.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -68,6 +69,7 @@ jobs:
           IMAGE="${REGISTRY}/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/viettel-gateway"
           TAG="sha-${GITHUB_SHA::7}"
           echo "ref=${IMAGE}:${TAG}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "tags<<EOF" >> "$GITHUB_OUTPUT"
           echo "${IMAGE}:${TAG}" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
@@ -96,11 +98,17 @@ jobs:
       cancel-in-progress: false
     timeout-minutes: 15
     steps:
+      - name: Resolve image reference
+        id: img
+        run: |
+          IMAGE="${REGISTRY}/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/viettel-gateway"
+          echo "ref=${IMAGE}:${{ needs.build.outputs.tag }}" >> "$GITHUB_OUTPUT"
+
       - name: Set image and wait for rollout
         uses: appleboy/ssh-action@v1.2.0
         env:
           NS: ${{ secrets.KUBE_NAMESPACE || 'viettel-prod' }}
-          IMAGE: ${{ needs.build.outputs.image }}
+          IMAGE: ${{ steps.img.outputs.ref }}
           DEPLOYMENT: ${{ env.DEPLOYMENT }}
         with:
           host: ${{ secrets.SSH_HOST }}
