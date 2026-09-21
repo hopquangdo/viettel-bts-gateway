@@ -1,0 +1,54 @@
+server:
+  port: ${GATEWAY_PORT:8090}
+
+spring:
+  application:
+    name: gateway
+  cloud:
+    gateway:
+      server:
+        webflux:
+          httpclient:
+            connect-timeout: ${GATEWAY_CONNECT_TIMEOUT_MS:5000}
+            # Không đặt response-timeout: chat SSE có thể kéo dài nhiều phút.
+            pool:
+              max-idle-time: 60s
+          # CORS do backend xử lý (kể cả preflight OPTIONS); gateway chuyển tiếp nguyên trạng,
+          # tránh trả header CORS hai lần.
+          routes:
+            # AI assistant. Mặc định vẫn trỏ về backend (backend đang relay + lưu lịch sử chat), nên hành vi
+            # không đổi. Sang pha 2 (ai-assistant-service tự phục vụ frontend) chỉ cần đặt
+            # GATEWAY_AI_ASSISTANT_URL=http://<ai-assistant-service>:8000. Route này phải đứng TRƯỚC backend-api.
+            - id: ai-assistant
+              uri: ${GATEWAY_AI_ASSISTANT_URL:${GATEWAY_BACKEND_URL:http://localhost:8080}}
+              predicates:
+                - Path=/api/v1/ai-assistant/**
+            # Backend (nghiệp vụ + auth).
+            - id: backend-api
+              uri: ${GATEWAY_BACKEND_URL:http://localhost:8080}
+              predicates:
+                - Path=/api/**,/uploads/**,/v3/api-docs/**,/swagger-ui/**,/swagger-ui.html
+
+gateway:
+  jwt:
+    secret: ${JWT_SECRET}
+  # Đường dẫn không cần JWT (khớp PUBLIC_ENDPOINTS của backend SecurityConfig).
+  public-paths:
+    - /api/v1/xac-thuc/dang-nhap
+    - /api/v1/xac-thuc/dang-ky
+    - /api/v1/xac-thuc/lam-moi-token
+    - /v3/api-docs/**
+    - /swagger-ui/**
+    - /swagger-ui.html
+    - /uploads/**
+    - /actuator/health
+  # MCP tool server chỉ dành cho chatbot trong mạng nội bộ: không cho ra ngoài qua gateway.
+  blocked-paths:
+    - /mcp/**
+    - /api/v1/tools/test/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
